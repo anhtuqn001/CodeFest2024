@@ -29,6 +29,13 @@ const Weapons = {
   Bomb: 2,
 };
 
+const Directions = {
+  Left: 1,
+  Right: 2,
+  Top: 3,
+  Down: 4,
+};
+
 const AllCellTypes = new Set([
   MapCell.Road,
   MapCell.Wall,
@@ -95,6 +102,7 @@ class GameMap {
     this.mapHeight = 0;
     this.playerMap = new Map();
     this.opponentPositions = new Set();
+    this.opponentPositionsRaw = [];
     this.mystics = new Set();
     this.eggs = new Set();
     this.oldOpponentBombs = [];
@@ -111,6 +119,13 @@ class GameMap {
     this.destinationEnd = Date.now();
     this.haltSignal = false;
     this.haltSignalTime = -1;
+    this.lastAttackTime = Date.now();
+    this.lastPosition = null;
+    this.currentDirection = Directions.Down;
+    this.lastCalculateSpecialSkill = Date.now();
+    this.lastUseSpecialSkillTime = Date.now();
+    this.hasOpponentTransform = false;
+    this.stopGame = null;
 
     this.reachableCells = new Set();
     this.emptyCells = new Set();
@@ -143,6 +158,20 @@ class GameMap {
         this.gameLock = true;
         let startPosition = this.player.position;
         let playerInfo = this.player.playerInfo;
+        this.calculateDirection(playerInfo.currentPosition);
+        if (
+          playerInfo.hasTransform &&
+          playerInfo.timeToUseSpecialWeapons > 0 &&
+          this.hasOpponentTransform &&
+          Date.now() - this.lastCalculateSpecialSkill > 2000 &&
+          Date.now() - this.lastUseSpecialSkillTime > 5000 &&
+          this.canUseSpecialSkill(playerInfo.currentPosition)
+        ) {
+          this.lastUseSpecialSkillTime = Date.now();
+          this.socket.emit("action", {
+            action: "use weapon",
+          });
+        }
         if (
           playerInfo.hasTransform &&
           playerInfo.currentWeapon === Weapons.Wooden
@@ -238,7 +267,11 @@ class GameMap {
     for (let opponent of opponents) {
       const p = opponent.currentPosition;
       this.opponentPositions.add(this.to1dPos(p.col, p.row));
+      this.opponentPositionsRaw.push(p);
       this.gstEggBeingAttacked = opponent.gstEggBeingAttacked;
+      if (!this.hasOpponentTransform) {
+        this.hasOpponentTransform = opponent.hasTransform;
+      }
     }
     this.playerMap = new Map();
     for (let player of mapInfo.players) {
@@ -321,6 +354,33 @@ class GameMap {
     [this.spot2, this.gstEgg2] = this.readMap2(true);
     [this.spot3, this.gstEgg3] = this.readMap2(true, true);
     this.run();
+  }
+
+  calculateDirection(newPlayerPosition) {
+    if (!this.lastPosition) {
+      this.lastPosition = newPlayerPosition;
+      return;
+    }
+    if (
+      newPlayerPosition.row === this.lastPosition.row &&
+      newPlayerPosition.col === this.lastPosition.col
+    )
+      return;
+    if (newPlayerPosition.row === this.lastPosition.row) {
+      if (newPlayerPosition.col > this.lastPosition.col) {
+        this.currentDirection = Directions.Right;
+      } else {
+        this.currentDirection = Directions.Left;
+      }
+    }
+    if (newPlayerPosition.col === this.lastPosition.col) {
+      if (newPlayerPosition.row > this.lastPosition.row) {
+        this.currentDirection = Directions.Down;
+      } else {
+        this.currentDirection = Directions.Top;
+      }
+    }
+    this.lastPosition = newPlayerPosition;
   }
 
   onJoinGame(res) {
@@ -588,36 +648,44 @@ class GameMap {
     return [val - 1, val + 1, val - cols, val + cols];
   }
 
-  isBalkDestroyable(p) {
+  isBalkDestroyable(p, loc) {
+    // console.log("p", p);
+    // console.log("this.player", this.player.position);
+
     let isBalkDestroyable = false;
     if (
       this.flatMap[p - 1] === MapCell.Road &&
       this.flatMap[p - 2] === MapCell.Road &&
-      this.reachableCells.has(p - 1)
+      this.reachableCells.has(p - 1) &&
+      loc === p - 1
     ) {
       isBalkDestroyable = true;
     }
     if (
       this.flatMap[p + 1] === MapCell.Road &&
       this.flatMap[p + 2] === MapCell.Road &&
-      this.reachableCells.has(p + 1)
+      this.reachableCells.has(p + 1) &&
+      loc === p + 1
     ) {
       isBalkDestroyable = true;
     }
     if (
       this.flatMap[p + this.mapWidth] === MapCell.Road &&
       this.flatMap[p + this.mapWidth * 2] === MapCell.Road &&
-      this.reachableCells.has(p + this.mapWidth)
+      this.reachableCells.has(p + this.mapWidth) &&
+      loc === p + this.mapWidth
     ) {
       isBalkDestroyable = true;
     }
     if (
       this.flatMap[p - this.mapWidth] === MapCell.Road &&
       this.flatMap[p - this.mapWidth * 2] === MapCell.Road &&
-      this.reachableCells.has(p - this.mapWidth)
+      this.reachableCells.has(p - this.mapWidth) &&
+      loc === p - this.mapWidth
     ) {
       isBalkDestroyable = true;
     }
+    // console.log("isBalkDestroyable", isBalkDestroyable);
     return isBalkDestroyable;
   }
 
@@ -650,7 +718,7 @@ class GameMap {
         // }
         if (
           (isUsingWooden
-            ? cellType === MapCell.WoodBalk && this.isBalkDestroyable(p)
+            ? cellType === MapCell.WoodBalk && this.isBalkDestroyable(p, loc)
             : cellType === MapCell.Balk) &&
           !this.rottenBoxes.has(p)
         ) {
@@ -824,7 +892,6 @@ class GameMap {
       }
 
       const neighbors = this.getNeighborNodes(currentNode.val);
-      console.log("scanRawMap neighbors", neighbors);
 
       for (let idx in neighbors) {
         const neighbor = neighbors[idx];
@@ -989,11 +1056,21 @@ class GameMap {
 
       if (!goodSpot) {
         goodSpot = spot;
+        // console.log("goodSpot", goodSpot);
         continue;
       }
-
-      if (spot.distance < 6 && spot.playerFootprint) {
+      const isAllowedAttack = Date.now() - this.lastAttackTime > 10000;
+      const isUsingBomb =
+        this.player.playerInfo.currentWeapon === Weapons.isUsingBomb;
+      if (
+        spot.distance < 15 &&
+        spot.playerFootprint &&
+        isAllowedAttack &&
+        isUsingBomb
+      ) {
+        this.lastAttackTime = Date.now();
         goodSpot = spot;
+        // console.log("goodSpot 0");
         console.log("found opponent", this.to2dPos(goodSpot.val));
         break;
       }
@@ -1005,9 +1082,10 @@ class GameMap {
                 goodSpotPoints = goodSpot.boxes * 0.7 + goodSpot.bonusPoints * 0.2;
             }
             */
-      if (this.checkForGoodSpot(spot, goodSpot)) {
-        goodSpot = spot;
-      }
+      // if (this.checkForGoodSpot(spot, goodSpot)) {
+      //   // console.log("goodSpot 01");
+      //   goodSpot = spot;
+      // }
     }
     let attackGSTEggSpot = null;
     for (let node of gstTargets) {
@@ -1017,6 +1095,7 @@ class GameMap {
       attackGSTEggSpot = node;
       break;
     }
+    // console.log("goodSpot 2", goodSpot);
     return [goodSpot, attackGSTEggSpot];
   }
 
@@ -1057,6 +1136,81 @@ class GameMap {
         this.storeRoadMap([goodSpot]);
       }
     }
+  }
+
+  canUseSpecialSkill(playerPosition) {
+    console.log("canUseSpecialSkill");
+    this.lastCalculateSpecialSkill = Date.now();
+    let shouldAttack = false;
+    if (
+      this.currentDirection === Directions.Left ||
+      this.currentDirection === Directions.Right
+    ) {
+      this.opponentPositions.forEach((oPosition) => {
+        const currentRow = playerPosition.row;
+        let max = (currentRow + 2) * this.mapWidth;
+        let min = max - 3 * this.mapWidth;
+        if (oPosition >= min && oPosition <= max) {
+          let pos = this.player.position;
+          if (oPosition <= currentRow * this.mapWidth) {
+            pos -= this.mapWidth;
+          } else if (oPosition > (currentRow + 1) * this.mapWidth) {
+            pos += this.mapWidth;
+          }
+
+          if (
+            (this.currentDirection === Directions.Left && oPosition < pos) ||
+            (this.currentDirection === Directions.Right && oPosition > pos)
+          ) {
+            if (this.currentDirection === Directions.Left) {
+              while (pos) {
+                console.log("canUseSpecialSkill 1", pos, oPosition);
+                console.log("canUseSpecialSkill 1 2", pos < oPosition);
+                if (
+                  [MapCell.WoodBalk, MapCell.Balk, MapCell.Wall].includes(
+                    this.flatMap[pos]
+                  ) ||
+                  pos < oPosition
+                ) {
+                  pos = null;
+                  continue;
+                }
+                if (pos === oPosition) {
+                  shouldAttack = true;
+                  pos = null;
+                  continue;
+                }
+                pos--;
+              }
+              return shouldAttack;
+            }
+            if (this.currentDirection === Directions.Right) {
+              while (pos) {
+                console.log("canUseSpecialSkill 2", pos, oPosition);
+                console.log("canUseSpecialSkill 2 2", pos > oPosition);
+                if (
+                  [MapCell.WoodBalk, MapCell.Balk, MapCell.Wall].includes(
+                    this.flatMap[pos]
+                  ) ||
+                  pos > oPosition
+                ) {
+                  pos = null;
+                  continue;
+                }
+                if (pos === oPosition) {
+                  shouldAttack = true;
+                  pos = null;
+                  continue;
+                }
+                pos++;
+              }
+              return shouldAttack;
+            }
+          }
+        }
+      });
+    }
+    return shouldAttack;
   }
 
   findGoodSpot(position, withMystic = false, withTeleport = false) {
