@@ -592,25 +592,29 @@ class GameMap {
     let isBalkDestroyable = false;
     if (
       this.flatMap[p - 1] === MapCell.Road &&
-      this.flatMap[p - 2] === MapCell.Road
+      this.flatMap[p - 2] === MapCell.Road &&
+      this.reachableCells.has(this.flatMap[p - 1])
     ) {
       isBalkDestroyable = true;
     }
     if (
       this.flatMap[p + 1] === MapCell.Road &&
-      this.flatMap[p + 2] === MapCell.Road
+      this.flatMap[p + 2] === MapCell.Road &&
+      this.reachableCells.has(this.flatMap[p + 1])
     ) {
       isBalkDestroyable = true;
     }
     if (
       this.flatMap[p + this.mapWidth] === MapCell.Road &&
-      this.flatMap[p + this.mapWidth * 2] === MapCell.Road
+      this.flatMap[p + this.mapWidth * 2] === MapCell.Road &&
+      this.reachableCells.has(this.flatMap[p + this.mapWidth])
     ) {
       isBalkDestroyable = true;
     }
     if (
       this.flatMap[p - this.mapWidth] === MapCell.Road &&
-      this.flatMap[p - this.mapWidth * 2] === MapCell.Road
+      this.flatMap[p - this.mapWidth * 2] === MapCell.Road &&
+      this.reachableCells.has(this.flatMap[p - this.mapWidth])
     ) {
       isBalkDestroyable = true;
     }
@@ -804,7 +808,6 @@ class GameMap {
   }
 
   scanRawMap(startNode, map, callback, withTeleport = false) {
-    console.log("startNode", startNode.val);
     const queue = [startNode];
     const visited = new Set([startNode.val]);
     while (queue.length) {
