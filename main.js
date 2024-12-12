@@ -593,28 +593,28 @@ class GameMap {
     if (
       this.flatMap[p - 1] === MapCell.Road &&
       this.flatMap[p - 2] === MapCell.Road &&
-      this.reachableCells.has(this.flatMap[p - 1])
+      this.reachableCells.has(p - 1)
     ) {
       isBalkDestroyable = true;
     }
     if (
       this.flatMap[p + 1] === MapCell.Road &&
       this.flatMap[p + 2] === MapCell.Road &&
-      this.reachableCells.has(this.flatMap[p + 1])
+      this.reachableCells.has(p + 1)
     ) {
       isBalkDestroyable = true;
     }
     if (
       this.flatMap[p + this.mapWidth] === MapCell.Road &&
       this.flatMap[p + this.mapWidth * 2] === MapCell.Road &&
-      this.reachableCells.has(this.flatMap[p + this.mapWidth])
+      this.reachableCells.has(p + this.mapWidth)
     ) {
       isBalkDestroyable = true;
     }
     if (
       this.flatMap[p - this.mapWidth] === MapCell.Road &&
       this.flatMap[p - this.mapWidth * 2] === MapCell.Road &&
-      this.reachableCells.has(this.flatMap[p - this.mapWidth])
+      this.reachableCells.has(p - this.mapWidth)
     ) {
       isBalkDestroyable = true;
     }
