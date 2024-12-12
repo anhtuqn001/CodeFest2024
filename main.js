@@ -16,11 +16,17 @@ const EnableEndGame = false;
 const MapCell = {
   Road: 0,
   Wall: 1,
-  Balk: 3,
+  Balk: 2,
+  WoodBalk: 3,
   // TeleportGate: 3,
   QuarantinePlace: 4,
   DragonEgg: 5,
   God: 6,
+};
+
+const Weapons = {
+  Wooden: 1,
+  Bomb: 2,
 };
 
 const AllCellTypes = new Set([
@@ -136,7 +142,15 @@ class GameMap {
       if (this.gameLock === false) {
         this.gameLock = true;
         let startPosition = this.player.position;
-
+        let playerInfo = this.player.playerInfo;
+        if (
+          playerInfo.hasTransform &&
+          playerInfo.currentWeapon === Weapons.Wooden
+        ) {
+          this.socket.emit("action", {
+            action: "switch weapon",
+          });
+        }
         if (this.roadMap[0] === this.player.position) {
           //logger.info(this.player.position);
           this.roadMap.shift();
@@ -448,9 +462,13 @@ class GameMap {
       );
       if (extendPath) {
         let direction = getPathFromRoot(standNode);
-        direction = this.adjustDirectionToDestroyBalk(standNode, direction);
-        // const tailPath = getPathFromRoot(extendPath);
-        const tailPath = "";
+        const isUsingWooden =
+          this.player.playerInfo.currentWeapon === Weapons.Wooden;
+        if (isUsingWooden) {
+          direction = this.adjustDirectionToDestroyBalk(standNode, direction);
+        }
+        const tailPath = isUsingWooden ? "" : getPathFromRoot(extendPath);
+        // const tailPath = "";
         this.drivePlayer(direction + "b" + tailPath, standNode);
         this.storeRoadMap([extendPath, standNode]);
         //this.canBomb = false;
@@ -464,25 +482,25 @@ class GameMap {
     let canDestroy = false;
     if (
       lastDirection === "1" &&
-      this.flatMap[standNode.val - 1] === MapCell.Balk
+      this.flatMap[standNode.val - 1] === MapCell.WoodBalk
     ) {
       canDestroy = true;
     }
     if (
       lastDirection === "2" &&
-      this.flatMap[standNode.val + 1] === MapCell.Balk
+      this.flatMap[standNode.val + 1] === MapCell.WoodBalk
     ) {
       canDestroy = true;
     }
     if (
       lastDirection === "3" &&
-      this.flatMap[standNode.val - this.mapWidth] === MapCell.Balk
+      this.flatMap[standNode.val - this.mapWidth] === MapCell.WoodBalk
     ) {
       canDestroy = true;
     }
     if (
       lastDirection === "4" &&
-      this.flatMap[standNode.val + this.mapWidth] === MapCell.Balk
+      this.flatMap[standNode.val + this.mapWidth] === MapCell.WoodBalk
     ) {
       canDestroy = true;
     }
@@ -494,25 +512,25 @@ class GameMap {
 
   adjustDirection = (standNode, direction) => {
     if (
-      this.flatMap[standNode.val - 1] === MapCell.Balk &&
+      this.flatMap[standNode.val - 1] === MapCell.WoodBalk &&
       this.flatMap[standNode.val + 1] === MapCell.Road
     ) {
       return direction + "21";
     }
     if (
-      this.flatMap[standNode.val + 1] === MapCell.Balk &&
+      this.flatMap[standNode.val + 1] === MapCell.WoodBalk &&
       this.flatMap[standNode.val - 1] === MapCell.Road
     ) {
       return direction + "12";
     }
     if (
-      this.flatMap[standNode.val - this.mapWidth] === MapCell.Balk &&
+      this.flatMap[standNode.val - this.mapWidth] === MapCell.WoodBalk &&
       this.flatMap[standNode.val + this.mapWidth] === MapCell.Road
     ) {
       return direction + "43";
     }
     if (
-      this.flatMap[standNode.val + this.mapWidth] === MapCell.Balk &&
+      this.flatMap[standNode.val + this.mapWidth] === MapCell.WoodBalk &&
       this.flatMap[standNode.val - this.mapWidth] === MapCell.Road
     ) {
       return direction + "34";
@@ -602,6 +620,8 @@ class GameMap {
   countBoxHits(node) {
     const loc = node.val;
     const playerPower = this.playerMap.get(this.playerId)?.power ?? 1;
+    const isUsingWooden =
+      this.player.playerInfo.currentWeapon === Weapons.Wooden;
     let boxes = 0;
     let isolatedBoxes = 0;
     const allDirections = [-1, 1, -this.mapWidth, this.mapWidth];
@@ -609,21 +629,25 @@ class GameMap {
       for (let i = 1; i <= playerPower; i++) {
         const p = loc + d * i;
         let cellType = this.flatMap[p];
-        if (cellType === MapCell.Wall) {
-          break;
-        }
-        if (cellType === MapCell.DragonEgg) {
-          if (p === this.playerGst) {
-            node.avoidThis = true;
-          }
-          if (p === this.targetGst) {
-            node.attackThis = true;
-          }
-          break;
-        }
         if (
-          cellType === MapCell.Balk &&
-          this.isBalkDestroyable(p) &&
+          cellType === MapCell.Wall ||
+          (!isUsingWooden ? cellType === MapCell.WoodBalk : false)
+        ) {
+          break;
+        }
+        // if (cellType === MapCell.DragonEgg) {
+        //   if (p === this.playerGst) {
+        //     node.avoidThis = true;
+        //   }
+        //   if (p === this.targetGst) {
+        //     node.attackThis = true;
+        //   }
+        //   break;
+        // }
+        if (
+          (isUsingWooden
+            ? cellType === MapCell.WoodBalk && this.isBalkDestroyable(p)
+            : cellType === MapCell.Balk) &&
           !this.rottenBoxes.has(p)
         ) {
           if (this.isIsolatedBalk(p)) {
