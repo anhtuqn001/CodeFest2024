@@ -6,7 +6,7 @@ var logger = require("morgan");
 var io = require("socket.io-client");
 const { GameMap } = require("./main.js");
 
-const gameId = "d55bf183-fe74-4187-b10a-30de5e7beea6";
+const gameId = "4fa3c5e2-2cc7-415f-a785-44a3e53a6763";
 const playerId = "player1-xxx";
 
 const socket = io("http://127.0.0.1/");

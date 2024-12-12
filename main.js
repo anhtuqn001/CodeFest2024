@@ -477,7 +477,7 @@ class GameMap {
   }
 
   adjustDirectionToDestroyBalk(standNode, direction) {
-    if (!direction) return adjustDirection(standNode, "");
+    if (!direction) return this.adjustDirection(standNode, "");
     const lastDirection = direction[direction.length - 1];
     let canDestroy = false;
     if (
