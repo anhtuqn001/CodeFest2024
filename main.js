@@ -477,7 +477,7 @@ class GameMap {
   }
 
   adjustDirectionToDestroyBalk(standNode, direction) {
-    if (!direction) return "";
+    if (!direction) return adjustDirection(standNode, "");
     const lastDirection = direction[direction.length - 1];
     let canDestroy = false;
     if (
@@ -1266,10 +1266,6 @@ class GameMap {
   }
 
   checkForSpecialSpot(map) {
-    console.log(
-      "this.player?.playerInfo?.hasTransform === false",
-      this.player?.playerInfo?.hasTransform === false
-    );
     for (let c in map) {
       const cellType = map[c];
       // if (!AllCellTypes.has(cellType)) {
