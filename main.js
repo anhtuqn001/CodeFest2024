@@ -164,13 +164,18 @@ class GameMap {
           playerInfo.timeToUseSpecialWeapons > 0 &&
           this.hasOpponentTransform &&
           Date.now() - this.lastCalculateSpecialSkill > 2000 &&
-          Date.now() - this.lastUseSpecialSkillTime > 5000 &&
+          Date.now() - this.lastUseSpecialSkillTime > 8000 &&
           this.canUseSpecialSkill(playerInfo.currentPosition)
         ) {
           this.lastUseSpecialSkillTime = Date.now();
           this.socket.emit("action", {
             action: "use weapon",
           });
+
+          setTimeout(() => {
+            this.gameLock = false;
+          }, 2000);
+          return;
         }
         if (
           playerInfo.hasTransform &&
@@ -263,6 +268,7 @@ class GameMap {
       (p) => !this.playerId.includes(p.id)
     );
     this.opponentPositions = new Set();
+    this.opponentPositionsRaw = [];
     this.gstEggBeingAttacked = 0;
     for (let opponent of opponents) {
       const p = opponent.currentPosition;
@@ -1139,7 +1145,6 @@ class GameMap {
   }
 
   canUseSpecialSkill(playerPosition) {
-    console.log("canUseSpecialSkill");
     this.lastCalculateSpecialSkill = Date.now();
     let shouldAttack = false;
     if (
@@ -1164,8 +1169,6 @@ class GameMap {
           ) {
             if (this.currentDirection === Directions.Left) {
               while (pos) {
-                console.log("canUseSpecialSkill 1", pos, oPosition);
-                console.log("canUseSpecialSkill 1 2", pos < oPosition);
                 if (
                   [MapCell.WoodBalk, MapCell.Balk, MapCell.Wall].includes(
                     this.flatMap[pos]
@@ -1178,7 +1181,7 @@ class GameMap {
                 if (pos === oPosition) {
                   shouldAttack = true;
                   pos = null;
-                  continue;
+                  break;
                 }
                 pos--;
               }
@@ -1186,8 +1189,6 @@ class GameMap {
             }
             if (this.currentDirection === Directions.Right) {
               while (pos) {
-                console.log("canUseSpecialSkill 2", pos, oPosition);
-                console.log("canUseSpecialSkill 2 2", pos > oPosition);
                 if (
                   [MapCell.WoodBalk, MapCell.Balk, MapCell.Wall].includes(
                     this.flatMap[pos]
@@ -1200,9 +1201,73 @@ class GameMap {
                 if (pos === oPosition) {
                   shouldAttack = true;
                   pos = null;
-                  continue;
+                  break;
                 }
                 pos++;
+              }
+              return shouldAttack;
+            }
+          }
+        }
+      });
+    }
+    if (
+      this.currentDirection === Directions.Top ||
+      this.currentDirection === Directions.Down
+    ) {
+      this.opponentPositionsRaw.forEach((oPositionRaw) => {
+        const oPosition = this.to1dPos(oPositionRaw.col, oPositionRaw.row);
+        const currentCol = playerPosition.col;
+        const currentRow = playerPosition.row;
+
+        if (
+          oPositionRaw.col >= currentCol - 1 &&
+          oPositionRaw.col <= currentCol + 1
+        ) {
+          let pos = this.to1dPos(oPositionRaw.col, currentRow);
+          if (
+            (this.currentDirection === Directions.Top &&
+              oPositionRaw.row < currentRow) ||
+            (this.currentDirection === Directions.Down &&
+              oPositionRaw.row > currentRow)
+          ) {
+            if (this.currentDirection === Directions.Top) {
+              while (pos) {
+                if (
+                  [MapCell.WoodBalk, MapCell.Balk, MapCell.Wall].includes(
+                    this.flatMap[pos]
+                  ) ||
+                  pos < oPosition
+                ) {
+                  pos = null;
+                  continue;
+                }
+                if (pos === oPosition) {
+                  shouldAttack = true;
+                  pos = null;
+                  break;
+                }
+                pos -= this.mapWidth;
+              }
+              return shouldAttack;
+            }
+            if (this.currentDirection === Directions.Down) {
+              while (pos) {
+                if (
+                  [MapCell.WoodBalk, MapCell.Balk, MapCell.Wall].includes(
+                    this.flatMap[pos]
+                  ) ||
+                  pos > oPosition
+                ) {
+                  pos = null;
+                  continue;
+                }
+                if (pos === oPosition) {
+                  shouldAttack = true;
+                  pos = null;
+                  break;
+                }
+                pos += this.mapWidth;
               }
               return shouldAttack;
             }
