@@ -171,7 +171,7 @@ class GameMap {
           this.socket.emit("action", {
             action: "use weapon",
           });
-
+          this.drivePlayer("x");
           setTimeout(() => {
             this.gameLock = false;
           }, 2000);
@@ -514,7 +514,7 @@ class GameMap {
       withTeleport = true;
     }
     if (standNode) {
-      //console.log('target', this.to2dPos(standNode.val));
+      // console.log("target", this.to2dPos(standNode.val));
       const node = new TreeNode(standNode.val);
       const extendPath = this.findSafePlace(
         standNode.val,
@@ -601,6 +601,7 @@ class GameMap {
     ) {
       return direction + "34";
     }
+    return direction;
   };
 
   goEatSomeEggs() {
@@ -1018,7 +1019,9 @@ class GameMap {
         currentNode.bonusPoints += 1;
       }
       if (
-        (currentNode.boxes > 0 || currentNode.isolatedBoxes >= 1) &&
+        (currentNode.boxes > 0 ||
+          currentNode.isolatedBoxes >= 1 ||
+          currentNode.playerFootprint) &&
         !currentNode.avoidThis
       ) {
         attackSpots.push(currentNode);
@@ -1065,11 +1068,10 @@ class GameMap {
         // console.log("goodSpot", goodSpot);
         continue;
       }
-      const isAllowedAttack = Date.now() - this.lastAttackTime > 10000;
-      const isUsingBomb =
-        this.player.playerInfo.currentWeapon === Weapons.isUsingBomb;
+      const isAllowedAttack = Date.now() - this.lastAttackTime > 5000;
+      const isUsingBomb = this.player.playerInfo.currentWeapon === Weapons.Bomb;
       if (
-        spot.distance < 15 &&
+        spot.distance < 20 &&
         spot.playerFootprint &&
         isAllowedAttack &&
         isUsingBomb
