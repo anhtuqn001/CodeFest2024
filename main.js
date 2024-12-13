@@ -163,8 +163,8 @@ class GameMap {
           playerInfo.hasTransform &&
           playerInfo.timeToUseSpecialWeapons > 0 &&
           this.hasOpponentTransform &&
-          Date.now() - this.lastCalculateSpecialSkill > 2000 &&
-          Date.now() - this.lastUseSpecialSkillTime > 8000 &&
+          Date.now() - this.lastCalculateSpecialSkill > 1500 &&
+          Date.now() - this.lastUseSpecialSkillTime > 6000 &&
           this.canUseSpecialSkill(playerInfo.currentPosition)
         ) {
           this.lastUseSpecialSkillTime = Date.now();
