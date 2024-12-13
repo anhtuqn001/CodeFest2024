@@ -1018,10 +1018,11 @@ class GameMap {
       if (this.eggs.has(currentNode.val)) {
         currentNode.bonusPoints += 1;
       }
+      const isUsingBomb = this.player.playerInfo.currentWeapon === Weapons.Bomb;
       if (
         (currentNode.boxes > 0 ||
           currentNode.isolatedBoxes >= 1 ||
-          currentNode.playerFootprint) &&
+          (isUsingBomb && currentNode.playerFootprint)) &&
         !currentNode.avoidThis
       ) {
         attackSpots.push(currentNode);
@@ -1071,7 +1072,7 @@ class GameMap {
       const isAllowedAttack = Date.now() - this.lastAttackTime > 5000;
       const isUsingBomb = this.player.playerInfo.currentWeapon === Weapons.Bomb;
       if (
-        spot.distance < 20 &&
+        spot.distance < 40 &&
         spot.playerFootprint &&
         isAllowedAttack &&
         isUsingBomb
